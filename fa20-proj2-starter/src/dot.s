@@ -25,54 +25,30 @@ dot:
     blt a3,t0,error_stride
     blt a4,t0,error_stride
 
-    addi sp,sp,-16
-    sw ra, 12(sp)
-    sw s0, 8(sp)
-    sw s1, 4(sp)
-    sw s2, 0(sp)
-
-    # s0 = 指针 v0 , s1 = 指针v1
-    mv s0,a0
-    mv s1,a1
-
-    li t0,0 # 点积和
-    li t1,0 # 当前循环计数 i
+    add t0,zero,a0 # pointer to v0
+    add t1,zero,a1 # pointer t0 v1
+    addi t2,zero,0 # counter
+    addi a0,zero,0 # result
+    slli a3,a3,2 # stride of v0
+    slli a4,a4,2 # stride of v1
 
     
 loop_start:
-    # if (i >= len) break
-    bge t1,a2,loop_end 
+    beq t2,a2,loop_end
+
+    lw t3,0(t0)
+    lw t4,0(t1)
+
+    mul t3,t3,t4
+    add a0,a0,t3
+
+    add t0,t0,a3
+    add t1,t1,a4
     
-    lw t2,0(s0) # t2 = v0[i]
-    lw t3,0(s1) # t3 = v1[i]
-    mul t4,t2,t3 # t4 = v0[i] * v1[i]
-    add t0,t0,t4 # 把每轮结果放到t0中
-
-    # 更新指针与循环计数
-    addi t1,t1,1 # i++
+    addi t2,t2,1
     
-    # v0 += stride_a * 4
-    mv s2,a3
-    slli s2,s2,2
-    add s0,s0,s2
-
-    # v1 += stride_b * 4
-    mv s2,a4
-    slli s2,s2,2
-    add s1,s1,s2
-
     j loop_start
-    
-
 loop_end:
-
-    mv a0,t0
-    # Epilogue
-    lw s2,0(sp)
-    lw s1,4(sp)
-    lw s0,8(sp)
-    lw ra,12(sp)
-    addi sp,sp,16
     
     ret
 
