@@ -50,7 +50,6 @@ loop_continue:
     j loop_start
 
 loop_end:
-    
 
     # Epilogue
     lw s1,0(sp)
