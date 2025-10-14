@@ -36,12 +36,47 @@ matmul:
 
 
     # Prologue
+    add t0,zero,a0 # pointer to m0
+    add t1,zero,a3 # pointer t0 m1
+    addi t2,zero,0 # counter (outer)
+    mul t3,a1,a5   # calculate need loop num  m*n n*k -> m*k
+    addi t4,zero,0 # result of inner loop
+    addi t5,zero,0 # counter (inner)
 
+    addi a2,zero,0 # 作为行计数器 
+
+    addi a0,t3,zero   # calculate need memory m*n n*k -> m*k
+    slli a0,a0,2   # every val have 4 byte memory
+    j malloc       # return a0 pointer to new matrix d
+    li a5,0
+    add a5,a0,zero # 保存 d 的地址
+    
 
 outer_loop_start:
+    beq t2,t3,loop_end
+    beq a2,a4,change_row_pointer # m1_col == m2_row 所以可以空出一个可以使用的 reg
 
 
+    j inner_loop_start
+    li t5,0 # 内部计数器重置
 
+    sw t4,0(a5) # 将结果存入新的地址空间
+    addi a5,a5,4 # 指向下一个元素
+
+    addi t4,zero,0 # 新一轮结果值重置为 0
+    addi t2,t2,1
+    addi a2,a2,1 # a2是行计数器，每执行到一行的数量，更改行头指针地址 eg.a[0][0] -> a[1][0]
+    
+    addi t1,t1,4 # 列指针指向下一个元素
+change_row_pointer:
+    li a2,1 
+    slli a2,a2,2 
+    mul a2,a1,a2 # offset = row_m0 * 4
+    add t0,t0,a2 # next_pointer = base + offset
+    mv t1,a3 # 恢复列指针指向第一列第一个元素
+    
+    
+    li a2,0 # 行计数重置
 
 inner_loop_start:
     beq t5,a4,outer_loop_start # inner loop execute col_m0 or row_m1
