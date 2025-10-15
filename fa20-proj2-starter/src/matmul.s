@@ -36,60 +36,83 @@ matmul:
 
 
     # Prologue
-    add t0,zero,a0 # pointer to m0
-    add t1,zero,a3 # pointer t0 m1
-    addi t2,zero,0 # counter (outer)
-    mul t3,a1,a5   # calculate need loop num  m*n n*k -> m*k
-    addi t4,zero,0 # result of inner loop
-    addi t5,zero,0 # counter (inner)
+    addi sp,sp,-32
+    sw ra,28(sp)
+    sw s0,24(sp)
+    sw s1,20(sp)
+    sw s2,16(sp)
+    sw s3,12(sp)
+    sw s4,8(sp)
 
-    addi a2,zero,0 # 作为行计数器 
+    # Setup saved registers
+    mv s0,a0 # base_m0
+    mv s1,a3 # base_m1
+    mv s2,a6 # base_d
+    mv s3,a2 # cols_mo = n
+    mv s4,a5 # cols_m1 = k
 
-    addi a0,t3,zero   # calculate need memory m*n n*k -> m*k
-    slli a0,a0,2   # every val have 4 byte memory
-    j malloc       # return a0 pointer to new matrix d
-    li a5,0
-    add a5,a0,zero # 保存 d 的地址
-    
-
-outer_loop_start:
-    beq t2,t3,loop_end
-    beq a2,a4,change_row_pointer # m1_col == m2_row 所以可以空出一个可以使用的 reg
+    # 要写第一个循环了，所以设置循环变量值
+    li t0,0  # i = 0
 
 
-    j inner_loop_start
-    li t5,0 # 内部计数器重置
 
-    sw t4,0(a5) # 将结果存入新的地址空间
-    addi a5,a5,4 # 指向下一个元素
+outer_loop_i:
+    bge t0,a1,done # if i>=rows_m0: done
+    li t1,0        # j = 0
 
-    addi t4,zero,0 # 新一轮结果值重置为 0
-    addi t2,t2,1
-    addi a2,a2,1 # a2是行计数器，每执行到一行的数量，更改行头指针地址 eg.a[0][0] -> a[1][0]
-    
-    addi t1,t1,4 # 列指针指向下一个元素
-change_row_pointer:
-    li a2,1 
-    slli a2,a2,2 
-    mul a2,a1,a2 # offset = row_m0 * 4
-    add t0,t0,a2 # next_pointer = base + offset
-    mv t1,a3 # 恢复列指针指向第一列第一个元素
-    
-    
-    li a2,0 # 行计数重置
+inner_loop_j:
+    bge t1,a5,next_i # if j>=cols_m1: next_i
+    li t2,0          # sum = 0
+    li t3,0          # r = 0
 
-inner_loop_start:
-    beq t5,a4,outer_loop_start # inner loop execute col_m0 or row_m1
-    lw t6,0(t0)
-    lw t7,0(t1)
-    mul t6,t6,t7
-    add t4,t4,t6
+inner_loop_r:
+    bge t3,s3,store_value # if r >= cols_m0: store
 
-    add t0,t0,4 # new_add = current_add + offset
-    slli t6,a4,2 # 列偏移 (使用t6作为暂存) offset
-    add t1,t1,t6 # base + offset
-    addi t5,t5,1
-loop_end:
+    # load m0[i][r]
+    mul t4,t0,s3          # i * col_m0
+    add t4,t4,t3          # + r
+    slli t4,t4,2          # *4 Bytes
+    add t4,s0,t4          
+    lw t5,0(t4)
+
+    # load m1[r][j]
+    mul t6,t3,s4          # r * col_m1
+    add t6,t6,t1          # + j
+    slli t6,t6,2          # * 4 Bytes
+    add t6,s1,t6
+    lw t4,0(t6)
+
+    # accumulate
+    mul t5,t5,t4
+    add t2,t2,t5
+
+    addi t3,t3,1
+    j inner_loop_r
+
+store_value:
+    # d[i][j] = sum
+    mul t4,t0,s4
+    add t4,t4,t1
+    slli t4,t4,2
+    add t4,t4,s2
+    sw t2,0(t4)
+
+    # j += 1
+    addi t1,t1,1
+    j inner_loop_j
+
+next_i:
+    addi t0,t0,1
+    j outer_loop_i
+
+done:
+    lw s4,8(sp)
+    lw s3,12(sp)
+    lw s2,16(sp)
+    lw s1,20(sp)
+    lw s0,24(sp)
+    lw ra,28(sp)
+    addi sp,sp,32
     ret
 
 error_length_m0:
