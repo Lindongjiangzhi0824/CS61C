@@ -60,5 +60,5 @@ loop_end:
     ret
 
 error_exit:
-    li a0,77
-    ecall           #exit(77)
+    li a1,77
+    j exit2           #exit(77)
